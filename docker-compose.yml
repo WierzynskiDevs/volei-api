@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: saque-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-saque}
+      POSTGRES_USER: ${DB_USERNAME:-saque}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-saque}
+      # Collation determinística — evita ordenação divergente entre ambientes.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - saque-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-saque} -d ${DB_DATABASE:-saque}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: saque-redis
+    restart: unless-stopped
+    # Filas e cache (CLAUDE.md §20). Nunca usado como fonte de verdade financeira.
+    command: redis-server --appendonly yes
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - saque-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  saque-postgres-data:
+  saque-redis-data:

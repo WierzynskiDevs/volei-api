@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: saque_test
+          POSTGRES_USER: saque
+          POSTGRES_PASSWORD: saque
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U saque -d saque_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pdo_pgsql, pgsql, bcmath, intl, zip
+          coverage: none
+
+      - name: Instalar dependências
+        run: composer install --prefer-dist --no-progress
+
+      - name: Pint (estilo)
+        run: vendor/bin/pint --test
+
+      - name: Larastan (análise estática)
+        run: vendor/bin/phpstan analyse --memory-limit=1G
+
+      - name: Preparar ambiente de teste
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: saque_test
+          DB_USERNAME: saque
+          DB_PASSWORD: saque
+          QUEUE_CONNECTION: sync
+          CACHE_STORE: array
+          SESSION_DRIVER: array
+
+      - name: Testes (Pest)
+        run: php artisan test
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: saque_test
+          DB_USERNAME: saque
+          DB_PASSWORD: saque
+          QUEUE_CONNECTION: sync
+          CACHE_STORE: array
+          SESSION_DRIVER: array
+
+      - name: Auditoria de dependências
+        run: composer audit

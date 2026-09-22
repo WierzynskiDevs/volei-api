@@ -1,0 +1,23 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 8
+
+    paths:
+        - app
+        - database
+        - config
+        - routes
+
+    treatPhpDocTypesAsCertain: false
+
+    ignoreErrors:
+        # Arquivos de configuração que vêm do skeleton do Laravel: env() é
+        # tipado como bool|string e o framework trata o valor como string.
+        # Não editamos config de terceiros só para satisfazer a análise.
+        -
+            message: '#expects string, bool\|string given#'
+            paths:
+                - config/filesystems.php
+                - config/sanctum.php
