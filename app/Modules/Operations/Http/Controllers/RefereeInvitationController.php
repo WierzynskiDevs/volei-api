@@ -53,15 +53,23 @@ final class RefereeInvitationController
         ]);
     }
 
-    /** `POST /referee-invitations/{token}/accept` */
+    /**
+     * `POST /referee-invitations/{token}/accept`.
+     *
+     * `session_token` vai em claro só nesta resposta — mesma regra do
+     * `apiKey` de subconta Asaas (`docs/asaas.md` §8) e do próprio token de
+     * convite: nunca mais recuperável depois, só o hash fica gravado.
+     */
     public function accept(string $token): JsonResponse
     {
-        $referee = $this->accept->execute($token, CarbonImmutable::now());
+        $result = $this->accept->execute($token, CarbonImmutable::now());
+        $referee = $result['referee'];
 
         return new JsonResponse([
             'data' => [
                 'referee_name' => $referee->name,
                 'accepted_at' => $referee->accepted_at?->toIso8601String(),
+                'session_token' => $result['sessionToken'],
             ],
         ]);
     }

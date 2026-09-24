@@ -14,9 +14,17 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Laravel\Sanctum\HasApiTokens;
 
 /**
  * Juiz convidado para um evento (ADR 0013 §5/§6/§8 — S8b).
+ *
+ * `HasApiTokens`: a sessão escopada por token (ADR 0013 §5) reaproveita a
+ * infra do Sanctum já instalada (`personal_access_tokens`, sem uso até
+ * agora) em vez de inventar mecanismo novo — o mesmo token polimórfico que o
+ * pacote já suporta para qualquer model, não só `User`. Nunca passa pelo
+ * guard `auth:sanctum` (isso continua exclusivo de `User`/cookie SPA,
+ * ADR 0005) — resolvido à mão por `EnsureRefereeSession`.
  *
  * @property string $id
  * @property string $event_id
@@ -31,9 +39,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 final class EventReferee extends Model
 {
+    use HasApiTokens;
+
     /** @use HasFactory<EventRefereeFactory> */
     use HasFactory;
-
     use HasUuids;
 
     protected $table = 'event_referees';
