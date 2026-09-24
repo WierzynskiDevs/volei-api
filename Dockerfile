@@ -31,10 +31,11 @@ RUN apk add --no-cache \
         zip \
         opcache \
     && apk del icu-dev libzip-dev postgresql-dev \
-    # apk del acima remove libpq.so junto (dependência transitiva órfã de
-    # postgresql-dev), quebrando pdo_pgsql em runtime com "could not find
-    # driver" mesmo com a extensão compilada — reinstala só a lib runtime.
-    && apk add --no-cache libpq
+    # apk del acima remove as libs runtime junto (dependências transitivas
+    # órfãs dos pacotes -dev: libpq, libicu, libzip), quebrando pdo_pgsql,
+    # intl e zip em runtime mesmo com as extensões compiladas com sucesso —
+    # reinstala só as libs runtime, sem os headers de build.
+    && apk add --no-cache libpq icu-libs libzip
 
 # Opcache de produção — CLAUDE.md não permite lentidão desnecessária, mas
 # também não permite cache do que muda por request (config já cuida disso).
