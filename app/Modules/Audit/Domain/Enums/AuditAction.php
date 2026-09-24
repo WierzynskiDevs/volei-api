@@ -36,6 +36,10 @@ enum AuditAction: string
      */
     case ORGANIZER_STATUS_CHANGED = 'ORGANIZER_STATUS_CHANGED';
     case ORGANIZER_PLAN_CHANGED = 'ORGANIZER_PLAN_CHANGED';
+    /** Pedido de abertura da subconta Asaas (ADR 0018). Nunca carrega apiKey/walletId. */
+    case ORGANIZER_PAYMENT_ACCOUNT_REQUESTED = 'ORGANIZER_PAYMENT_ACCOUNT_REQUESTED';
+    /** Subconta aprovada pelo gateway, `payment_account_status` → `LINKED` (ADR 0018 §6). */
+    case ORGANIZER_PAYMENT_ACCOUNT_LINKED = 'ORGANIZER_PAYMENT_ACCOUNT_LINKED';
 
     // Eventos
     case EVENT_CREATED = 'EVENT_CREATED';

@@ -30,6 +30,9 @@ use RuntimeException;
  * @property OrganizerStatus $status
  * @property PaymentAccountStatus $payment_account_status
  * @property ?DocumentType $document_type
+ * @property string|null $payment_account_external_id
+ * @property string|null $payment_account_api_key_encrypted
+ * @property string|null $payment_account_wallet_id
  */
 final class Organizer extends Model
 {
@@ -64,6 +67,9 @@ final class Organizer extends Model
     protected $hidden = [
         'contact_phone_encrypted',
         'payment_account_external_id',
+        'payment_account_api_key_encrypted',
+        'payment_account_wallet_id',
+        'payment_account_mobile_phone_encrypted',
         'document_number_encrypted',
         'document_number_hash',
     ];
@@ -77,6 +83,9 @@ final class Organizer extends Model
             'contact_phone_encrypted' => 'encrypted',
             'document_number_encrypted' => 'encrypted',
             'document_type' => DocumentType::class,
+            // Credencial da SUBCONTA — nunca em claro fora da chamada ao gateway (CLAUDE.md §21).
+            'payment_account_api_key_encrypted' => 'encrypted',
+            'payment_account_mobile_phone_encrypted' => 'encrypted',
         ];
     }
 
