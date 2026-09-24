@@ -11,14 +11,18 @@ use App\Modules\Administration\Http\Controllers\AdminPaymentController;
 use App\Modules\Administration\Http\Controllers\AdminUserController;
 use App\Modules\Auth\Http\Controllers\AuthController;
 use App\Modules\Brackets\Http\Controllers\OrganizerBracketController;
+use App\Modules\Brackets\Http\Controllers\PublicBracketController;
 use App\Modules\Events\Http\Controllers\OrganizerEventController;
 use App\Modules\Events\Http\Controllers\PublicEventController;
 use App\Modules\Finance\Http\Controllers\OrganizerFinanceController;
 use App\Modules\Operations\Http\Controllers\MatchController;
 use App\Modules\Operations\Http\Controllers\OrganizerCourtController;
 use App\Modules\Operations\Http\Controllers\OrganizerRefereeController;
+use App\Modules\Operations\Http\Controllers\PublicMatchController;
 use App\Modules\Operations\Http\Controllers\RefereeInvitationController;
+use App\Modules\Operations\Http\Controllers\RefereeMatchController;
 use App\Modules\Organizers\Http\Controllers\OrganizerOnboardingController;
+use App\Modules\Organizers\Http\Controllers\OrganizerPaymentAccountController;
 use App\Modules\Organizers\Http\Controllers\OrganizerPlanController;
 use App\Modules\Payments\Http\Controllers\PaymentController;
 use App\Modules\Payments\Http\Controllers\WebhookController;
@@ -63,6 +67,25 @@ Route::prefix('v1')->group(function (): void {
     Route::get('events/{slug}', [PublicEventController::class, 'show'])->name('events.show');
 
     /* ---------------------------------------------------------------- *
+     * Chaveamento e partidas — público (ADR 0017, Q15)
+     *
+     * Sem autenticação: quem abre o link do evento vê a chave e os
+     * resultados. Nunca visível antes de `BRACKET_PUBLISHED` — em rascunho
+     * é ferramenta de trabalho do organizador, não dado público (ADR 0011
+     * §7). `throttle:api` porque, mesmo sem sessão, é leitura de terceiro
+     * (mesmo padrão de `referee-invitations`/`players`).
+     *
+     * Consumidor: abas "Chaveamento"/"Agenda"/"Resultados" de
+     * eventos.$slug.tsx no volei-app.
+     * ---------------------------------------------------------------- */
+    Route::get('events/{slug}/bracket', [PublicBracketController::class, 'show'])
+        ->middleware('throttle:api')
+        ->name('events.bracket.show');
+    Route::get('events/{slug}/matches', [PublicMatchController::class, 'index'])
+        ->middleware('throttle:api')
+        ->name('events.matches.index');
+
+    /* ---------------------------------------------------------------- *
      * Webhook do gateway — público por natureza (CLAUDE.md §14)
      *
      * O gateway não tem sessão. A autenticação é o token compartilhado no
@@ -88,6 +111,20 @@ Route::prefix('v1')->group(function (): void {
     Route::post('referee-invitations/{token}/accept', [RefereeInvitationController::class, 'accept'])
         ->middleware('throttle:api')
         ->name('referee-invitations.accept');
+
+    /* ---------------------------------------------------------------- *
+     * Área do juiz — sessão por token, nunca por cookie (ADR 0013 §5/§7)
+     *
+     * `referee-session` resolve o Bearer token contra `personal_access_tokens`
+     * e recusa qualquer coisa que não seja um `EventReferee` — nunca
+     * `auth:sanctum` (aquele guard é exclusivo do cookie SPA de `User`).
+     *
+     * Consumidor: /juiz no volei-app.
+     * ---------------------------------------------------------------- */
+    Route::middleware(['referee-session', 'throttle:api'])->group(function (): void {
+        Route::get('referee/matches', [RefereeMatchController::class, 'index'])
+            ->name('referee.matches.index');
+    });
 
     /* ---------------------------------------------------------------- *
      * Autenticação — sessão ativa
@@ -237,6 +274,13 @@ Route::prefix('v1')->group(function (): void {
 
             // Plano do organizador — consumidor: /organizador/plano.
             Route::get('plan', OrganizerPlanController::class)->name('plan');
+
+            /*
+             * Vinculação da conta de recebimento (ADR 0018) — consumidor:
+             * /organizador/plano, seção "Conta Asaas".
+             */
+            Route::post('payment-account', [OrganizerPaymentAccountController::class, 'store'])
+                ->name('payment-account.store');
 
             Route::post('registrations/{registration}/approve', [OrganizerRegistrationController::class, 'approve'])
                 ->name('registrations.approve');

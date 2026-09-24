@@ -8,10 +8,13 @@ use App\Modules\Events\Http\Policies\EventPolicy;
 use App\Modules\Events\Infrastructure\Models\Event;
 use App\Modules\Operations\Domain\Services\RefereePhoneProtector;
 use App\Modules\Organizers\Domain\Services\DocumentProtector;
+use App\Modules\Payments\Domain\PaymentAccountProviderInterface;
 use App\Modules\Payments\Domain\PaymentProviderInterface;
 use App\Modules\Payments\Http\Policies\PaymentPolicy;
 use App\Modules\Payments\Infrastructure\Models\Payment;
+use App\Modules\Payments\Infrastructure\Providers\AsaasPaymentAccountProvider;
 use App\Modules\Payments\Infrastructure\Providers\AsaasPaymentProvider;
+use App\Modules\Payments\Infrastructure\Providers\FakePaymentAccountProvider;
 use App\Modules\Payments\Infrastructure\Providers\FakePaymentProvider;
 use App\Modules\Registrations\Http\Policies\RegistrationPolicy;
 use App\Modules\Registrations\Infrastructure\Models\Registration;
@@ -49,6 +52,7 @@ final class AppServiceProvider extends ServiceProvider
         );
 
         $this->registerPaymentProvider();
+        $this->registerPaymentAccountProvider();
     }
 
     /**
@@ -77,6 +81,29 @@ final class AppServiceProvider extends ServiceProvider
                 apiKey: (string) config('saque.payments.asaas.api_key'),
                 platformWalletId: (string) config('saque.payments.asaas.platform_wallet_id'),
                 webhookToken: (string) config('saque.payments.asaas.webhook_token'),
+                timeoutSeconds: (int) config('saque.payments.asaas.timeout_seconds', 20),
+            );
+        });
+    }
+
+    /**
+     * Provedor de conta por configuração (ADR 0018) — mesma chave
+     * `saque.payments.provider` do provedor de cobrança: os dois falam com o
+     * mesmo gateway, não faz sentido configurá-los separadamente.
+     */
+    private function registerPaymentAccountProvider(): void
+    {
+        $this->app->singleton(PaymentAccountProviderInterface::class, function (): PaymentAccountProviderInterface {
+            $driver = (string) config('saque.payments.provider', 'fake');
+
+            if ($driver !== 'asaas') {
+                return new FakePaymentAccountProvider;
+            }
+
+            return new AsaasPaymentAccountProvider(
+                http: $this->app->make(HttpFactory::class),
+                baseUrl: (string) config('saque.payments.asaas.base_url'),
+                apiKey: (string) config('saque.payments.asaas.api_key'),
                 timeoutSeconds: (int) config('saque.payments.asaas.timeout_seconds', 20),
             );
         });

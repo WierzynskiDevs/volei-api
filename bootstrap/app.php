@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Modules\Administration\Http\Middleware\EnsureSuperAdmin;
+use App\Modules\Operations\Http\Middleware\EnsureRefereeSession;
 use App\Shared\Http\ApiExceptionRenderer;
 use App\Shared\Http\Middleware\AssignRequestId;
 use App\Shared\Http\Middleware\EnsureAccountIsActive;
@@ -38,6 +39,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
             // Primeira camada do painel administrativo (ADR 0010 §4).
             'super-admin' => EnsureSuperAdmin::class,
+
+            // Sessão do juiz por token, nunca por cookie (ADR 0013 §5/§7).
+            'referee-session' => EnsureRefereeSession::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Modules\Organizers\Http\Console\ReconcilePaymentAccountsCommand;
 use App\Modules\Payments\Http\Console\ReconcilePaymentsCommand;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -23,6 +24,16 @@ Artisan::command('inspire', function () {
  * cobranças e gastariam quota (25.000 requisições/12h) em dobro.
  */
 Schedule::command(ReconcilePaymentsCommand::class)
+    ->everyFifteenMinutes()
+    ->withoutOverlapping()
+    ->runInBackground();
+
+/*
+ * Reconciliação de subcontas pendentes (ADR 0018 §6). Webhook de conta não
+ * foi adotado — catálogo de eventos não confirmado (docs/asaas.md §9) — então
+ * o polling é a única forma de saber que o gateway aprovou uma subconta.
+ */
+Schedule::command(ReconcilePaymentAccountsCommand::class)
     ->everyFifteenMinutes()
     ->withoutOverlapping()
     ->runInBackground();
