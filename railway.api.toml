@@ -1,0 +1,17 @@
+# Serviço "api" no Railway (ADR 0019). No dashboard, aponte o "Config as Code
+# Path" deste serviço para este arquivo. Sem startCommand: usa o ENTRYPOINT
+# padrão do Dockerfile (docker/entrypoint.sh, modo "web" — nginx + PHP-FPM).
+#
+# ⚠️ Formato "Config as Code" anunciado para descontinuação em 01/12/2026,
+# substituído por Infrastructure as Code (.railway/railway.ts) — migrar antes
+# do corte (ADR 0019).
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/up"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

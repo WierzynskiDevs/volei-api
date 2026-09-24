@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd /var/www/html
 
-# Render injeta PORT; fora do Render (teste local do container) cai no EXPOSE.
+# Railway (e antes, Render) injeta PORT; localmente cai no EXPOSE.
 export PORT="${PORT:-8080}"
 
 php artisan config:clear >/dev/null
@@ -19,13 +19,14 @@ case "${1:-web}" in
 
         exec supervisord -c /etc/supervisor/conf.d/supervisord.conf
         ;;
-    queue)
-        # Disparado pelo Render Cron Job (CLAUDE.md §20: fila processa
-        # assíncrono; sem worker contínuo grátis, o cron é quem drena a fila).
-        # `--stop-when-empty` encerra o processo assim que não há mais job,
-        # em vez de ficar residente — essencial porque o Cron Job é cobrado
-        # (ou limitado) por tempo de execução.
-        exec php artisan queue:work --stop-when-empty --max-time=50 --tries=3
+    worker)
+        # Serviço "worker" do Railway (ADR 0019) — processo residente, não
+        # "drena e sai": diferente do Cron Job do Render que a ADR 0012 usava,
+        # o Railway sustenta um worker contínuo de verdade.
+        # `--max-time=3600` reinicia o processo a cada hora (higiene de
+        # memória de worker PHP de longa duração); a queda é coberta pelo
+        # restartPolicyType=ALWAYS do railway.worker.toml.
+        exec php artisan queue:work --tries=3 --max-time=3600
         ;;
     *)
         exec "$@"
