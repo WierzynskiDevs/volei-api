@@ -8,6 +8,8 @@ use App\Modules\Audit\Application\AuditLogger;
 use App\Modules\Audit\Domain\Enums\AuditAction;
 use App\Modules\Events\Domain\Enums\RegistrationFieldKey;
 use App\Modules\Events\Infrastructure\Models\Event;
+use App\Modules\Notifications\Application\NotificationDispatcher;
+use App\Modules\Notifications\Domain\Enums\NotificationType;
 use App\Modules\Registrations\Application\DTO\RegistrationData;
 use App\Modules\Registrations\Domain\Enums\GroupStatus;
 use App\Modules\Registrations\Domain\Enums\RegistrationStatus;
@@ -52,6 +54,7 @@ final readonly class CreateRegistrationAction
     public function __construct(
         private EventOccupancy $occupancy,
         private AuditLogger $audit,
+        private NotificationDispatcher $notifications,
     ) {}
 
     public function execute(Event $event, User $actor, RegistrationData $data, CarbonImmutable $now): Registration
@@ -83,7 +86,35 @@ final readonly class CreateRegistrationAction
             ],
         );
 
+        if ($partnerRegistration !== null) {
+            $this->notifyPartnerInvited($event, $actor, $partnerRegistration);
+        }
+
         return $registration;
+    }
+
+    /**
+     * B4 (`docs/PLANO-CONTINUACAO-2026-09.md`). O parceiro sempre tem conta
+     * própria com e-mail real — é encontrado por busca (ADR 0015 §"parceiro
+     * já precisa ter conta"), nunca convidado por e-mail digitado à mão.
+     */
+    private function notifyPartnerInvited(Event $event, User $captain, Registration $partnerRegistration): void
+    {
+        $partnerRegistration->loadMissing('user');
+        $partner = $partnerRegistration->user;
+
+        if (! $partner instanceof User) {
+            return;
+        }
+
+        $this->notifications->queueEmail(
+            type: NotificationType::PARTNER_INVITED,
+            recipient: $partner,
+            subject: "Convite para jogar em dupla — {$event->name}",
+            body: "{$captain->name} convidou você para jogar em dupla no evento \"{$event->name}\". "
+                .'Acesse "Minhas inscrições" no BeacHub para aceitar ou recusar o convite.',
+            metadata: ['event_id' => $event->id, 'registration_id' => $partnerRegistration->id],
+        );
     }
 
     /**

@@ -6,6 +6,10 @@ use App\Modules\Audit\Domain\Enums\AuditAction;
 use App\Modules\Audit\Infrastructure\Models\AuditLog;
 use App\Modules\Events\Domain\Enums\LevelCategory;
 use App\Modules\Events\Infrastructure\Models\Event;
+use App\Modules\Notifications\Domain\Enums\NotificationChannel;
+use App\Modules\Notifications\Domain\Enums\NotificationDeliveryStatus;
+use App\Modules\Notifications\Domain\Enums\NotificationType;
+use App\Modules\Notifications\Infrastructure\Models\NotificationDelivery;
 use App\Modules\Registrations\Domain\Enums\LevelReview;
 use App\Modules\Registrations\Domain\Enums\RegistrationStatus;
 use App\Modules\Registrations\Infrastructure\Models\Registration;
@@ -109,6 +113,32 @@ describe('POST /api/v1/events/{slug}/registrations', function (): void {
 
         expect($partnerRegistration->status)->toBe(RegistrationStatus::PENDING_ACCEPTANCE)
             ->and($partnerRegistration->is_captain)->toBeFalse();
+    });
+
+    /*
+     * B4 (docs/PLANO-CONTINUACAO-2026-09.md): o parceiro sempre tem conta com
+     * e-mail real (é achado por busca, ADR 0015) — nunca convidado por e-mail
+     * digitado à mão. QUEUE_CONNECTION=sync em teste (phpunit.xml): o job já
+     * rodou quando a resposta HTTP volta.
+     */
+    it('enfileira notificação de convite de dupla para o parceiro', function (): void {
+        $partner = User::factory()->create(['email' => 'parceiro@example.com']);
+
+        $this->actingAs($this->athlete)
+            ->postJson("/api/v1/events/{$this->event->slug}/registrations", registrationPayload([
+                'partner_mode' => 'PARTNER',
+                'partner_user_id' => $partner->id,
+            ]))
+            ->assertCreated();
+
+        $delivery = NotificationDelivery::query()
+            ->where('recipient_user_id', $partner->id)
+            ->sole();
+
+        expect($delivery->type)->toBe(NotificationType::PARTNER_INVITED)
+            ->and($delivery->channel)->toBe(NotificationChannel::EMAIL)
+            ->and($delivery->recipient_email)->toBe('parceiro@example.com')
+            ->and($delivery->status)->toBe(NotificationDeliveryStatus::SENT);
     });
 
     /*

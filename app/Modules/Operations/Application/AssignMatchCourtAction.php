@@ -19,7 +19,10 @@ use App\Modules\Users\Infrastructure\Models\User;
  */
 final readonly class AssignMatchCourtAction
 {
-    public function __construct(private AuditLogger $audit) {}
+    public function __construct(
+        private AuditLogger $audit,
+        private NotifyMatchReadyAction $notifyReady,
+    ) {}
 
     public function execute(GameMatch $match, User $actor, ?string $courtId): GameMatch
     {
@@ -36,6 +39,7 @@ final readonly class AssignMatchCourtAction
             }
         }
 
+        $previousStatus = $match->status;
         $match->court_id = $courtId;
         $match->status = MatchStatus::fromAssignment($courtId, $match->referee_id);
         $match->save();
@@ -47,6 +51,8 @@ final readonly class AssignMatchCourtAction
             targetId: $match->id,
             metadata: ['event_id' => $match->event_id, 'court_id' => $courtId],
         );
+
+        $this->notifyReady->execute($match, $previousStatus);
 
         return $match;
     }

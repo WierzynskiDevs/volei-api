@@ -6,8 +6,11 @@ use App\Modules\Audit\Domain\Enums\AuditAction;
 use App\Modules\Audit\Infrastructure\Models\AuditLog;
 use App\Modules\Events\Domain\Enums\EventStatus;
 use App\Modules\Events\Infrastructure\Models\Event;
+use App\Modules\Notifications\Domain\Enums\NotificationType;
+use App\Modules\Notifications\Infrastructure\Models\NotificationDelivery;
 use App\Modules\Operations\Infrastructure\Models\Court;
 use App\Modules\Operations\Infrastructure\Models\EventReferee;
+use App\Modules\Operations\Infrastructure\Models\GameMatch;
 use App\Modules\Organizers\Infrastructure\Models\Organizer;
 use App\Modules\Registrations\Infrastructure\Models\RegistrationGroup;
 use App\Modules\Users\Infrastructure\Models\User;
@@ -106,6 +109,42 @@ describe('atribuição de quadra e juiz', function (): void {
             ])
             ->assertOk()
             ->assertJsonPath('data.status', 'PRONTA');
+    });
+
+    /*
+     * B4 (docs/PLANO-CONTINUACAO-2026-09.md): "atribuição de partida" notifica
+     * só na transição PARA PRONTA — nunca em cada atribuição parcial isolada,
+     * senão duplicaria e-mail numa reatribuição de quadra já pronta.
+     */
+    it('notifica os jogadores quando a partida fica PRONTA, só uma vez', function (): void {
+        $teamA = confirmedTeam($this->event);
+        $teamB = confirmedTeam($this->event);
+        $court = Court::factory()->forEvent($this->event)->create();
+        $secondCourt = Court::factory()->forEvent($this->event)->create();
+        $referee = EventReferee::factory()->forEvent($this->event)->create();
+        $match = createMatch($this->event, $teamA, $teamB);
+
+        $this->actingAs($this->organizerUser)
+            ->postJson("/api/v1/organizer/events/{$this->event->slug}/matches/{$match->id}/court", [
+                'court_id' => $court->id,
+            ])->assertOk();
+
+        expect(NotificationDelivery::query()->count())->toBe(0);
+
+        $this->actingAs($this->organizerUser)
+            ->postJson("/api/v1/organizer/events/{$this->event->slug}/matches/{$match->id}/referee", [
+                'referee_id' => $referee->id,
+            ])->assertOk()->assertJsonPath('data.status', 'PRONTA');
+
+        expect(NotificationDelivery::query()->where('type', NotificationType::MATCH_READY)->count())->toBe(4);
+
+        // Reatribuir a quadra de uma partida já PRONTA não reabre o aviso.
+        $this->actingAs($this->organizerUser)
+            ->postJson("/api/v1/organizer/events/{$this->event->slug}/matches/{$match->id}/court", [
+                'court_id' => $secondCourt->id,
+            ])->assertOk();
+
+        expect(NotificationDelivery::query()->where('type', NotificationType::MATCH_READY)->count())->toBe(4);
     });
 
     it('recusa quadra de outro evento — 422 (IDOR de parâmetro)', function (): void {
@@ -316,39 +355,39 @@ describe('POST /api/v1/organizer/events/{slug}/matches/{match}/cancel', function
     });
 });
 
-function createMatch(Event $event, RegistrationGroup $teamA, RegistrationGroup $teamB): App\Modules\Operations\Infrastructure\Models\GameMatch
+function createMatch(Event $event, RegistrationGroup $teamA, RegistrationGroup $teamB): GameMatch
 {
-    return App\Modules\Operations\Infrastructure\Models\GameMatch::factory()
+    return GameMatch::factory()
         ->forEvent($event)
         ->betweenTeams($teamA, $teamB)
         ->create();
 }
 
-function readyMatch(Event $event, RegistrationGroup $teamA, RegistrationGroup $teamB): App\Modules\Operations\Infrastructure\Models\GameMatch
+function readyMatch(Event $event, RegistrationGroup $teamA, RegistrationGroup $teamB): GameMatch
 {
     $court = Court::factory()->forEvent($event)->create();
     $referee = EventReferee::factory()->forEvent($event)->create();
 
-    return App\Modules\Operations\Infrastructure\Models\GameMatch::factory()
+    return GameMatch::factory()
         ->forEvent($event)
         ->betweenTeams($teamA, $teamB)
         ->ready($court, $referee)
         ->create();
 }
 
-function startedMatch(Event $event, RegistrationGroup $teamA, RegistrationGroup $teamB): App\Modules\Operations\Infrastructure\Models\GameMatch
+function startedMatch(Event $event, RegistrationGroup $teamA, RegistrationGroup $teamB): GameMatch
 {
     $court = Court::factory()->forEvent($event)->create();
     $referee = EventReferee::factory()->forEvent($event)->create();
 
-    return App\Modules\Operations\Infrastructure\Models\GameMatch::factory()
+    return GameMatch::factory()
         ->forEvent($event)
         ->betweenTeams($teamA, $teamB)
         ->inProgress($court, $referee)
         ->create();
 }
 
-function recordSet(mixed $test, Event $event, App\Modules\Operations\Infrastructure\Models\GameMatch $match, int $setNumber, int $scoreA, int $scoreB): void
+function recordSet(mixed $test, Event $event, GameMatch $match, int $setNumber, int $scoreA, int $scoreB): void
 {
     $test->actingAs($test->organizerUser)
         ->putJson("/api/v1/organizer/events/{$event->slug}/matches/{$match->id}/sets", [

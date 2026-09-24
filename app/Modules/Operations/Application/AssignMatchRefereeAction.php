@@ -16,7 +16,10 @@ use App\Modules\Users\Infrastructure\Models\User;
 /** Atribui (ou remove) o juiz de uma partida (ADR 0013 §4/§8 — S9). */
 final readonly class AssignMatchRefereeAction
 {
-    public function __construct(private AuditLogger $audit) {}
+    public function __construct(
+        private AuditLogger $audit,
+        private NotifyMatchReadyAction $notifyReady,
+    ) {}
 
     public function execute(GameMatch $match, User $actor, ?string $refereeId): GameMatch
     {
@@ -33,6 +36,7 @@ final readonly class AssignMatchRefereeAction
             }
         }
 
+        $previousStatus = $match->status;
         $match->referee_id = $refereeId;
         $match->status = MatchStatus::fromAssignment($match->court_id, $refereeId);
         $match->save();
@@ -44,6 +48,8 @@ final readonly class AssignMatchRefereeAction
             targetId: $match->id,
             metadata: ['event_id' => $match->event_id, 'referee_id' => $refereeId],
         );
+
+        $this->notifyReady->execute($match, $previousStatus);
 
         return $match;
     }
