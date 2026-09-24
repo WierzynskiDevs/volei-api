@@ -13,12 +13,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 /**
  * A dupla (ADR 0001).
  *
- * Model é persistência (CLAUDE.md §4.3). O único método além de relação e cast é
- * `displayName()`, que é formatação de apresentação — não decide nada.
+ * Model é persistência (CLAUDE.md §4.3). Os únicos métodos além de relação e
+ * cast são `displayName()`/`publicDisplayName()`, formatação de
+ * apresentação — não decidem nada de negócio.
  *
  * @property string $id
  * @property string $event_id
@@ -94,5 +96,34 @@ final class RegistrationGroup extends Model
             ->all();
 
         return $names === [] ? 'Dupla' : implode(' / ', $names);
+    }
+
+    /**
+     * Nome da dupla para exibição PÚBLICA (ADR 0017): primeiro nome de cada
+     * membro, nunca o sobrenome — reduz a superfície de identificação numa
+     * lista que qualquer visitante do link do evento pode ver, diferente de
+     * `displayName()` (organizador autenticado, nome completo). Mesma regra
+     * de fallback para `display_name` manual e para relação não carregada.
+     */
+    public function publicDisplayName(): string
+    {
+        if ($this->display_name !== null && trim($this->display_name) !== '') {
+            return $this->display_name;
+        }
+
+        if (! $this->relationLoaded('registrations')) {
+            return 'Dupla';
+        }
+
+        $firstNames = $this->registrations
+            ->map(function (Registration $r): ?string {
+                $name = $r->relationLoaded('user') ? $r->user?->name : null;
+
+                return $name === null || $name === '' ? null : Str::of($name)->trim()->before(' ')->toString();
+            })
+            ->filter(fn (?string $name): bool => $name !== null && $name !== '')
+            ->all();
+
+        return $firstNames === [] ? 'Dupla' : implode(' / ', $firstNames);
     }
 }
