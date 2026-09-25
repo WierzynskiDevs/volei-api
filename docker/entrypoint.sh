@@ -11,6 +11,11 @@ php artisan config:clear >/dev/null
 case "${1:-web}" in
     web)
         php artisan migrate --force
+        # Dados de referência de negócio, não dado de teste: PlanSeeder não
+        # tem guard de produção e é idempotente (firstOrCreate por `code`) —
+        # sem ele, qualquer ação que dependa de um plano (onboarding de
+        # organizador) falha com 404 (Plan::firstOrFail) em banco novo.
+        php artisan db:seed --class=PlanSeeder --force
         php artisan config:cache
         php artisan route:cache
         php artisan event:cache
