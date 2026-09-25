@@ -81,7 +81,15 @@ return [
     'middleware' => [
         'authenticate_session' => AuthenticateSession::class,
         'encrypt_cookies' => EncryptCookies::class,
-        'validate_csrf_token' => ValidateCsrfToken::class,
+
+        /*
+         * ADR 0020: desligado (env) enquanto app/API não compartilham domínio
+         * registrável — o double-submit CSRF do Sanctum depende do frontend
+         * ler o cookie XSRF-TOKEN via JS, e isso é impossível entre domínios
+         * diferentes (restrição do próprio navegador, não configuração).
+         * Reverter para `true` assim que o domínio próprio existir.
+         */
+        'validate_csrf_token' => env('SANCTUM_CSRF_ENABLED', true) ? ValidateCsrfToken::class : null,
     ],
 
 ];
