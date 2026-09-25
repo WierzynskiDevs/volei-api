@@ -33,7 +33,7 @@ final readonly class ChangeEventStatusAction
      */
     public function execute(
         Event $event,
-        User $actor,
+        ?User $actor,
         EventStatus $target,
         ?string $reason = null,
         ?CarbonImmutable $now = null,

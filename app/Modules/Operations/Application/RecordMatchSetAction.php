@@ -24,7 +24,7 @@ final readonly class RecordMatchSetAction
 {
     public function __construct(private AuditLogger $audit) {}
 
-    public function execute(GameMatch $match, User $actor, int $setNumber, int $scoreA, int $scoreB): MatchSet
+    public function execute(GameMatch $match, ?User $actor, int $setNumber, int $scoreA, int $scoreB): MatchSet
     {
         $this->assertRecordable($match->status);
 

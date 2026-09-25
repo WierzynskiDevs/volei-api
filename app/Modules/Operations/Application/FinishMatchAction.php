@@ -29,7 +29,7 @@ final readonly class FinishMatchAction
 {
     public function __construct(private AuditLogger $audit) {}
 
-    public function execute(GameMatch $match, User $actor, string $idempotencyKey, CarbonImmutable $now): GameMatch
+    public function execute(GameMatch $match, ?User $actor, string $idempotencyKey, CarbonImmutable $now): GameMatch
     {
         /** @var array{0: GameMatch, 1: bool} $result */
         $result = DB::transaction(function () use ($match, $actor, $idempotencyKey, $now): array {
@@ -59,7 +59,7 @@ final readonly class FinishMatchAction
 
             $locked->status = MatchStatus::FINALIZADA;
             $locked->finished_at = $now;
-            $locked->finished_by = $actor->id;
+            $locked->finished_by = $actor?->id;
             $locked->finish_idempotency_key = $idempotencyKey;
             $locked->save();
 

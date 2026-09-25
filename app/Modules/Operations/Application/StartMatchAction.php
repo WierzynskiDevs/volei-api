@@ -36,7 +36,7 @@ final readonly class StartMatchAction
         private ChangeEventStatusAction $changeEventStatus,
     ) {}
 
-    public function execute(GameMatch $match, User $actor, string $idempotencyKey, CarbonImmutable $now): GameMatch
+    public function execute(GameMatch $match, ?User $actor, string $idempotencyKey, CarbonImmutable $now): GameMatch
     {
         /** @var array{0: GameMatch, 1: bool} $result */
         $result = DB::transaction(function () use ($match, $actor, $idempotencyKey, $now): array {
@@ -57,7 +57,7 @@ final readonly class StartMatchAction
 
             $locked->status = MatchStatus::EM_ANDAMENTO;
             $locked->started_at = $now;
-            $locked->started_by = $actor->id;
+            $locked->started_by = $actor?->id;
             $locked->start_idempotency_key = $idempotencyKey;
             $locked->save();
 
@@ -86,7 +86,7 @@ final readonly class StartMatchAction
      * máquina de estados: a segunda partida iniciada não encontra nada para
      * transicionar (ADR 0013 §3).
      */
-    private function advanceEventIfNeeded(GameMatch $match, User $actor, CarbonImmutable $now): void
+    private function advanceEventIfNeeded(GameMatch $match, ?User $actor, CarbonImmutable $now): void
     {
         /** @var Event $event */
         $event = Event::query()->whereKey($match->event_id)->lockForUpdate()->firstOrFail();

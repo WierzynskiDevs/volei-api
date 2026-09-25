@@ -124,6 +124,12 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware(['referee-session', 'throttle:api'])->group(function (): void {
         Route::get('referee/matches', [RefereeMatchController::class, 'index'])
             ->name('referee.matches.index');
+        Route::post('referee/matches/{match}/start', [RefereeMatchController::class, 'start'])
+            ->name('referee.matches.start');
+        Route::put('referee/matches/{match}/sets', [RefereeMatchController::class, 'recordSet'])
+            ->name('referee.matches.sets');
+        Route::post('referee/matches/{match}/finish', [RefereeMatchController::class, 'finish'])
+            ->name('referee.matches.finish');
     });
 
     /* ---------------------------------------------------------------- *
